@@ -32,6 +32,9 @@ import { useWorkouts, workoutSummary } from './health/workoutData'
 import { goalProgress, useGoals } from './health/goalData'
 import { HabitsPage } from './habits/HabitsPage'
 import { habitSummary, useHabits } from './habits/habits'
+import { ProjectsPage } from './projects/ProjectsPage'
+import { ProjectDetail } from './projects/ProjectDetail'
+import { projectProgress, useProjects } from './projects/projects'
 
 type IconComponent = typeof Home
 
@@ -83,6 +86,7 @@ const pillars: Pillar[] = [
 const weeklyData: WeeklyPoint[] = []
 const habitData: HabitPoint[] = []
 const activityData: ActivityPoint[] = []
+const dashboardNow = Date.now()
 
 function App() {
   return <AuthProvider><Routes><Route path="/acceso" element={<GuestRoute><AuthPage /></GuestRoute>} /><Route path="*" element={<ProtectedRoute><MomentumApp /></ProtectedRoute>} /></Routes></AuthProvider>
@@ -166,6 +170,8 @@ function MomentumApp() {
           <Route path="/inicio" element={<Dashboard />} />
           <Route path="/salud" element={<WeightPage />} />
           <Route path="/habitos" element={<HabitsPage />} />
+          <Route path="/proyectos" element={<ProjectsPage />} />
+          <Route path="/proyectos/:id" element={<ProjectDetail />} />
           {pillars.filter((pillar) => pillar.path !== '/salud').map((pillar) => <Route key={pillar.path} path={pillar.path} element={<ModulePage pillar={pillar} />} />)}
           <Route path="/prioridades" element={<PrioritiesPage />} />
           <Route path="/configuracion" element={<SettingsPage />} />
@@ -189,8 +195,16 @@ function Dashboard() {
     <section aria-labelledby="pillars-title"><div className="section-heading"><div><p className="eyebrow">Tus pilares</p><h2 id="pillars-title">Resumen</h2></div></div><div className="summary-grid"><HealthSummaryCard />{pillars.filter((pillar) => pillar.title !== 'Salud').map(({ icon: Icon, title, path, tone }) => <NavLink aria-label={`Ver ${title}: sin datos`} className={`summary-card summary-card--${tone}`} key={path} to={path}><div className="summary-card-header"><span className="pillar-icon"><Icon size={19} /></span><TrendingUp aria-hidden="true" className="trend-icon" size={17} /></div><p>{title}</p><strong>{title === 'Proyectos' ? '0 activos' : title === 'Hábitos' ? '0 de 0' : 'Sin datos'}</strong><span className="summary-status"><i />Sin actividad</span><span aria-hidden="true" className="mini-progress"><i /></span></NavLink>)}</div></section>
     <EisenhowerWidget />
     <section aria-labelledby="charts-title" className="charts-section"><div className="section-heading"><div><p className="eyebrow">Vista general</p><h2 id="charts-title">Actividad</h2></div><span className="section-status">Sin datos este período</span></div><div className="charts-grid"><ChartCard className="chart-card--wide" title="Evolución semanal" status="Sin registros"><WeeklyChart /></ChartCard><ChartCard title="Cumplimiento de hábitos" status="0 de 0"><HabitsChart /></ChartCard><ChartCard title="Actividad por pilar" status="Sin datos"><ActivityChart /></ChartCard></div></section>
-    <section className="dashboard-columns"><HealthGoalsSummary /><HabitsSummary /></section>
+    <section className="dashboard-columns"><ProjectsSummary /><HabitsSummary /><HealthGoalsSummary /></section>
   </div>
+}
+
+function ProjectsSummary() {
+  const { user } = useAuth(); const query = useProjects(user?.id)
+  if (query.isLoading) return <CompactPanel icon={<FolderKanban size={19}/>} title="Proyectos" value="Cargando…" detail="" />
+  if (query.error || !query.data) return <CompactPanel icon={<FolderKanban size={19}/>} title="Proyectos" value="No disponibles" detail="No se pudieron cargar los proyectos." />
+  const active = query.data.projects.filter((project) => project.status === 'active'); const projectTasks = query.data.tasks; const pending = projectTasks.filter((task) => task.status !== 'completed'); const overdue = pending.filter((task) => task.due_at && new Date(task.due_at).getTime() < dashboardNow)
+  return <section className="compact-panel"><div className="compact-panel-heading"><span className="empty-icon"><FolderKanban size={19}/></span><div><h2>Proyectos</h2><strong>{active.length} activos · {pending.length} pendientes</strong></div></div>{active.length ? <ul className="dashboard-goals">{active.slice(0, 3).map((project) => { const progress = projectProgress(project, projectTasks); return <li key={project.id}><NavLink to={`/proyectos/${project.id}`}><span>{project.name}</span><strong>{progress.completed}/{progress.total} tareas · {progress.percent.toFixed(0)}%</strong></NavLink></li> })}</ul> : <p>Todavía no hay proyectos activos.</p>}<p>{overdue.length ? `${overdue.length} tareas vencidas` : 'Sin tareas vencidas'}</p></section>
 }
 
 function HabitsSummary() { const { user } = useAuth(); const habits = useHabits(user?.id); if (habits.isLoading) return <CompactPanel icon={<ClipboardList size={19}/>} title="Hábitos" value="Cargando…" detail="" />; if (habits.error || !habits.data) return <CompactPanel icon={<ClipboardList size={19}/>} title="Hábitos" value="No disponibles" detail="No se pudieron cargar." />; const summary = habitSummary(habits.data.habits, habits.data.entries); return <NavLink className="compact-panel" to="/habitos"><div className="compact-panel-heading"><span className="empty-icon"><ClipboardList size={19}/></span><div><h2>Hábitos</h2><strong>{summary.completed}/{summary.active.length} completados</strong></div></div><p>{summary.active.length - summary.completed} pendientes hoy · {summary.weeklyPercent.toFixed(0)}% semanal</p></NavLink> }
