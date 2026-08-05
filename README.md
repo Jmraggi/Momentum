@@ -21,6 +21,18 @@ npm install
 npm run dev
 ```
 
+## Supabase local
+
+La configuración local está preparada, pero todavía no incluye tablas, migraciones de producto, autenticación ni cliente de Supabase.
+
+```bash
+npm run supabase:start
+npm run supabase:status
+npm run supabase:stop
+```
+
+Copiá `.env.example` a `.env.local` si necesitás reconstruir las variables de entorno. La clave anónima local se muestra con `npm run supabase:status`; `.env.local` no se versiona.
+
 Para validar el proyecto:
 
 ```bash

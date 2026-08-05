@@ -7,6 +7,8 @@ import {
   FolderKanban,
   HeartPulse,
   Home,
+  LogOut,
+  ListTodo,
   Menu,
   Plus,
   PanelLeftClose,
@@ -19,6 +21,15 @@ import {
 import { useState, type ReactNode } from 'react'
 import { NavLink, Navigate, Route, Routes } from 'react-router-dom'
 import { Bar, BarChart, CartesianGrid, Cell, Line, LineChart, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
+import { AuthPage } from './auth/AuthPage'
+import { AuthProvider, useAuth } from './auth/AuthProvider'
+import { TasksBoard } from './tasks/TasksBoard'
+import { EisenhowerWidget } from './tasks/EisenhowerWidget'
+import { WeightPage } from './health/WeightPage'
+import { useWeightData, weightDifference } from './health/weight'
+import { getCheckinSummary, useDailyCheckinData } from './health/dailyCheckinData'
+import { useWorkouts, workoutSummary } from './health/workoutData'
+import { goalProgress, useGoals } from './health/goalData'
 
 type IconComponent = typeof Home
 
@@ -57,6 +68,7 @@ const navigation: NavigationItem[] = [
   { label: 'Finanzas', path: '/finanzas', icon: CircleDollarSign },
   { label: 'Proyectos', path: '/proyectos', icon: FolderKanban },
   { label: 'Hábitos', path: '/habitos', icon: ClipboardList },
+  { label: 'Prioridades', path: '/prioridades', icon: ListTodo },
 ]
 
 const pillars: Pillar[] = [
@@ -71,8 +83,29 @@ const habitData: HabitPoint[] = []
 const activityData: ActivityPoint[] = []
 
 function App() {
+  return <AuthProvider><Routes><Route path="/acceso" element={<GuestRoute><AuthPage /></GuestRoute>} /><Route path="*" element={<ProtectedRoute><MomentumApp /></ProtectedRoute>} /></Routes></AuthProvider>
+}
+
+function ProtectedRoute({ children }: { children: ReactNode }) {
+  const { isLoading, session } = useAuth()
+  if (isLoading) return <SessionLoading />
+  return session ? <>{children}</> : <Navigate replace to="/acceso" />
+}
+
+function GuestRoute({ children }: { children: ReactNode }) {
+  const { isLoading, session } = useAuth()
+  if (isLoading) return <SessionLoading />
+  return session ? <Navigate replace to="/inicio" /> : <>{children}</>
+}
+
+function SessionLoading() {
+  return <main className="session-loading"><span className="brand-mark">M</span><p>Restaurando tu sesión…</p></main>
+}
+
+function MomentumApp() {
   const [isMenuOpen, setIsMenuOpen] = useState(false)
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => localStorage.getItem('momentum-sidebar') === 'collapsed')
+  const { user } = useAuth()
 
   const closeMenu = () => setIsMenuOpen(false)
   const toggleSidebar = () => {
@@ -107,6 +140,7 @@ function App() {
           ))}
         </nav>
         <div className="sidebar-footer">
+          <p className="user-email" title={user?.email}>{user?.email}</p>
           <NavLink aria-label="Configuración" className="nav-link" title="Configuración" to="/configuracion" onClick={closeMenu}>
             <Settings size={19} strokeWidth={2} />
             <span className="nav-label">Configuración</span>
@@ -128,7 +162,9 @@ function App() {
         <Routes>
           <Route path="/" element={<Navigate replace to="/inicio" />} />
           <Route path="/inicio" element={<Dashboard />} />
-          {pillars.map((pillar) => <Route key={pillar.path} path={pillar.path} element={<ModulePage pillar={pillar} />} />)}
+          <Route path="/salud" element={<WeightPage />} />
+          {pillars.filter((pillar) => pillar.path !== '/salud').map((pillar) => <Route key={pillar.path} path={pillar.path} element={<ModulePage pillar={pillar} />} />)}
+          <Route path="/prioridades" element={<PrioritiesPage />} />
           <Route path="/configuracion" element={<SettingsPage />} />
           <Route path="*" element={<NotFoundPage />} />
         </Routes>
@@ -147,10 +183,27 @@ function Dashboard() {
     <section aria-labelledby="today-title" className="today-section">
       <div className="today-card"><div className="today-title"><span className="today-icon"><Activity size={19} /></span><div><p className="eyebrow">En foco</p><h2 id="today-title">Hoy</h2></div></div><p>Sin registros para hoy.</p><button className="text-button" type="button">Registrar <ChevronRight size={17} /></button></div>
     </section>
-    <section aria-labelledby="pillars-title"><div className="section-heading"><div><p className="eyebrow">Tus pilares</p><h2 id="pillars-title">Resumen</h2></div></div><div className="summary-grid">{pillars.map(({ icon: Icon, title, path, tone }) => <NavLink aria-label={`Ver ${title}: sin datos`} className={`summary-card summary-card--${tone}`} key={path} to={path}><div className="summary-card-header"><span className="pillar-icon"><Icon size={19} /></span><TrendingUp aria-hidden="true" className="trend-icon" size={17} /></div><p>{title}</p><strong>{title === 'Proyectos' ? '0 activos' : title === 'Hábitos' ? '0 de 0' : 'Sin datos'}</strong><span className="summary-status"><i />Sin actividad</span><span aria-hidden="true" className="mini-progress"><i /></span></NavLink>)}</div></section>
+    <section aria-labelledby="pillars-title"><div className="section-heading"><div><p className="eyebrow">Tus pilares</p><h2 id="pillars-title">Resumen</h2></div></div><div className="summary-grid"><HealthSummaryCard />{pillars.filter((pillar) => pillar.title !== 'Salud').map(({ icon: Icon, title, path, tone }) => <NavLink aria-label={`Ver ${title}: sin datos`} className={`summary-card summary-card--${tone}`} key={path} to={path}><div className="summary-card-header"><span className="pillar-icon"><Icon size={19} /></span><TrendingUp aria-hidden="true" className="trend-icon" size={17} /></div><p>{title}</p><strong>{title === 'Proyectos' ? '0 activos' : title === 'Hábitos' ? '0 de 0' : 'Sin datos'}</strong><span className="summary-status"><i />Sin actividad</span><span aria-hidden="true" className="mini-progress"><i /></span></NavLink>)}</div></section>
+    <EisenhowerWidget />
     <section aria-labelledby="charts-title" className="charts-section"><div className="section-heading"><div><p className="eyebrow">Vista general</p><h2 id="charts-title">Actividad</h2></div><span className="section-status">Sin datos este período</span></div><div className="charts-grid"><ChartCard className="chart-card--wide" title="Evolución semanal" status="Sin registros"><WeeklyChart /></ChartCard><ChartCard title="Cumplimiento de hábitos" status="0 de 0"><HabitsChart /></ChartCard><ChartCard title="Actividad por pilar" status="Sin datos"><ActivityChart /></ChartCard></div></section>
-    <section className="dashboard-columns"><CompactPanel icon={<Target size={19} />} title="Objetivos activos" value="0 activos" detail="Todavía no hay objetivos." action="Crear objetivo" /><CompactPanel icon={<Activity size={19} />} title="Actividad reciente" value="Sin actividad" detail="Los próximos registros aparecerán acá." /></section>
+    <section className="dashboard-columns"><HealthGoalsSummary /><CompactPanel icon={<Activity size={19} />} title="Actividad reciente" value="Sin actividad" detail="Los próximos registros aparecerán acá." /></section>
   </div>
+}
+
+function HealthGoalsSummary() {
+  const { user } = useAuth(); const goals = useGoals(user?.id); const weight = useWeightData(user?.id); const workouts = useWorkouts(user?.id)
+  if (goals.isLoading) return <CompactPanel icon={<Target size={19} />} title="Objetivos de salud" value="Cargando…" detail="" />
+  if (goals.error) return <CompactPanel icon={<Target size={19} />} title="Objetivos de salud" value="No disponibles" detail="No se pudieron cargar los objetivos." />
+  const active = (goals.data ?? []).filter((goal) => goal.status === 'active').sort((a, b) => { const first = a.due_date ? new Date(a.due_date).getTime() : Number.POSITIVE_INFINITY; const second = b.due_date ? new Date(b.due_date).getTime() : Number.POSITIVE_INFINITY; return first - second || new Date(a.created_at).getTime() - new Date(b.created_at).getTime() }).slice(0, 3); const training = workoutSummary(workouts.data ?? []); const current = (goal: typeof active[number]) => goal.target_type === 'weekly_frequency' ? training.count : goal.target_type === 'weekly_duration' ? training.minutes : weight.data?.entries[0]?.numeric_value ?? null
+  return <section className="compact-panel"><div className="compact-panel-heading"><span className="empty-icon"><Target size={19} /></span><div><h2>Objetivos de salud</h2><strong>{active.length} activos</strong></div></div>{active.length ? <ul className="dashboard-goals">{active.map((goal) => { const value = current(goal); const progress = goalProgress(goal, value); return <li key={goal.id}><NavLink to="/salud"><span>{goal.title}</span><strong>{progress === null ? 'Sin datos' : `${progress.toFixed(0)}%`}{value !== null && goal.target_value !== null ? ` · ${value}/${goal.target_value}` : ''}{goal.due_date ? ` · ${new Intl.DateTimeFormat('es-AR',{dateStyle:'short'}).format(new Date(`${goal.due_date}T00:00:00`))}` : ''}</strong></NavLink></li> })}</ul> : <p>Todavía no hay objetivos activos.</p>}</section>
+}
+
+function HealthSummaryCard() {
+  const { user } = useAuth(); const weight = useWeightData(user?.id); const checkin = useDailyCheckinData(user?.id); const workouts = useWorkouts(user?.id); const last = weight.data?.entries[0]; const difference = weight.data ? weightDifference(weight.data.entries) : null; const summary = checkin.data ? getCheckinSummary(checkin.data) : null; const training = workouts.data ? workoutSummary(workouts.data) : null
+  const loading = weight.isLoading || checkin.isLoading; const failed = weight.error && checkin.error; const lines = [last ? `Peso: ${last.numeric_value} kg${difference === null ? '' : ` (${difference > 0 ? '+' : ''}${difference.toFixed(1)} kg)`}` : null, summary?.weeklySleep !== null && summary?.weeklySleep !== undefined ? `Sueño 7 días: ${summary.weeklySleep.toFixed(1)} h` : null, summary?.energy !== null && summary?.energy !== undefined ? `Energía: ${summary.energy}/5` : null, summary?.latestDate ? `Check-in: ${summary.latestDate}` : null].filter(Boolean)
+  if (training && training.count) lines.push(`Entrenamientos: ${training.count} · ${training.minutes} min`)
+  const value = loading ? 'Cargando…' : failed ? 'No se pudo cargar' : lines.length ? 'Datos actualizados' : 'Sin datos'
+  return <NavLink aria-label={`Ver Salud: ${value}`} className="summary-card summary-card--blue" to="/salud"><div className="summary-card-header"><span className="pillar-icon"><HeartPulse size={19} /></span><TrendingUp aria-hidden="true" className="trend-icon" size={17} /></div><p>Salud</p><strong>{value}</strong><span className="summary-status"><i />{lines.length ? lines.join(' · ') : value}</span><span aria-hidden="true" className="mini-progress"><i /></span></NavLink>
 }
 
 function ChartCard({ children, className = '', status, title }: { children: ReactNode; className?: string; status: string; title: string }) {
@@ -187,7 +240,12 @@ function ModulePage({ pillar }: { pillar: Pillar }) {
 }
 
 function SettingsPage() {
-  return <div className="page module-page"><PageHeader eyebrow="Preferencias" title="Configuración" description="Personalizá Momentum cuando necesites." /><section className="module-hero"><span className="module-icon module-icon--blue"><Settings size={28} /></span><h2>Tu espacio, a tu medida</h2><p>Las preferencias y opciones de tu cuenta estarán disponibles acá en una próxima etapa.</p></section></div>
+  const { signOut, user } = useAuth()
+  return <div className="page module-page"><PageHeader eyebrow="Preferencias" title="Configuración" description="Personalizá Momentum cuando necesites." /><section className="module-hero"><span className="module-icon module-icon--blue"><Settings size={28} /></span><h2>Tu espacio, a tu medida</h2><p>{user?.email}</p><button className="secondary-button" onClick={() => void signOut()} type="button"><LogOut size={17} />Cerrar sesión</button></section></div>
+}
+
+function PrioritiesPage() {
+  return <div className="page priorities-page"><PageHeader eyebrow="Matriz de Eisenhower" title="Prioridades" description="Ordená tus tareas según urgencia e importancia." /><TasksBoard /></div>
 }
 
 function NotFoundPage() {
