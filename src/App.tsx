@@ -34,6 +34,8 @@ import { HabitsPage } from './habits/HabitsPage'
 import { habitSummary, useHabits } from './habits/habits'
 import { ProjectsPage } from './projects/ProjectsPage'
 import { ProjectDetail } from './projects/ProjectDetail'
+import { FinancePage } from './finance/FinancePage'
+import { financeSummary, fromMinor, useFinance } from './finance/finance'
 import { projectProgress, useProjects } from './projects/projects'
 
 type IconComponent = typeof Home
@@ -172,6 +174,7 @@ function MomentumApp() {
           <Route path="/habitos" element={<HabitsPage />} />
           <Route path="/proyectos" element={<ProjectsPage />} />
           <Route path="/proyectos/:id" element={<ProjectDetail />} />
+          <Route path="/finanzas" element={<FinancePage />} />
           {pillars.filter((pillar) => pillar.path !== '/salud').map((pillar) => <Route key={pillar.path} path={pillar.path} element={<ModulePage pillar={pillar} />} />)}
           <Route path="/prioridades" element={<PrioritiesPage />} />
           <Route path="/configuracion" element={<SettingsPage />} />
@@ -192,7 +195,7 @@ function Dashboard() {
     <section aria-labelledby="today-title" className="today-section">
       <div className="today-card"><div className="today-title"><span className="today-icon"><Activity size={19} /></span><div><p className="eyebrow">En foco</p><h2 id="today-title">Hoy</h2></div></div><p>Sin registros para hoy.</p><button className="text-button" type="button">Registrar <ChevronRight size={17} /></button></div>
     </section>
-    <section aria-labelledby="pillars-title"><div className="section-heading"><div><p className="eyebrow">Tus pilares</p><h2 id="pillars-title">Resumen</h2></div></div><div className="summary-grid"><HealthSummaryCard />{pillars.filter((pillar) => pillar.title !== 'Salud').map(({ icon: Icon, title, path, tone }) => <NavLink aria-label={`Ver ${title}: sin datos`} className={`summary-card summary-card--${tone}`} key={path} to={path}><div className="summary-card-header"><span className="pillar-icon"><Icon size={19} /></span><TrendingUp aria-hidden="true" className="trend-icon" size={17} /></div><p>{title}</p><strong>{title === 'Proyectos' ? '0 activos' : title === 'Hábitos' ? '0 de 0' : 'Sin datos'}</strong><span className="summary-status"><i />Sin actividad</span><span aria-hidden="true" className="mini-progress"><i /></span></NavLink>)}</div></section>
+    <section aria-labelledby="pillars-title"><div className="section-heading"><div><p className="eyebrow">Tus pilares</p><h2 id="pillars-title">Resumen</h2></div></div><div className="summary-grid"><HealthSummaryCard /><FinanceSummaryCard />{pillars.filter((pillar) => pillar.title !== 'Salud' && pillar.title !== 'Finanzas').map(({ icon: Icon, title, path, tone }) => <NavLink aria-label={`Ver ${title}: sin datos`} className={`summary-card summary-card--${tone}`} key={path} to={path}><div className="summary-card-header"><span className="pillar-icon"><Icon size={19} /></span><TrendingUp aria-hidden="true" className="trend-icon" size={17} /></div><p>{title}</p><strong>{title === 'Proyectos' ? '0 activos' : title === 'Hábitos' ? '0 de 0' : 'Sin datos'}</strong><span className="summary-status"><i />Sin actividad</span><span aria-hidden="true" className="mini-progress"><i /></span></NavLink>)}</div></section>
     <EisenhowerWidget />
     <section aria-labelledby="charts-title" className="charts-section"><div className="section-heading"><div><p className="eyebrow">Vista general</p><h2 id="charts-title">Actividad</h2></div><span className="section-status">Sin datos este período</span></div><div className="charts-grid"><ChartCard className="chart-card--wide" title="Evolución semanal" status="Sin registros"><WeeklyChart /></ChartCard><ChartCard title="Cumplimiento de hábitos" status="0 de 0"><HabitsChart /></ChartCard><ChartCard title="Actividad por pilar" status="Sin datos"><ActivityChart /></ChartCard></div></section>
     <section className="dashboard-columns"><ProjectsSummary /><HabitsSummary /><HealthGoalsSummary /></section>
@@ -223,6 +226,32 @@ function HealthSummaryCard() {
   if (training && training.count) lines.push(`Entrenamientos: ${training.count} · ${training.minutes} min`)
   const value = loading ? 'Cargando…' : failed ? 'No se pudo cargar' : lines.length ? 'Datos actualizados' : 'Sin datos'
   return <NavLink aria-label={`Ver Salud: ${value}`} className="summary-card summary-card--blue" to="/salud"><div className="summary-card-header"><span className="pillar-icon"><HeartPulse size={19} /></span><TrendingUp aria-hidden="true" className="trend-icon" size={17} /></div><p>Salud</p><strong>{value}</strong><span className="summary-status"><i />{lines.length ? lines.join(' · ') : value}</span><span aria-hidden="true" className="mini-progress"><i /></span></NavLink>
+}
+
+function FinanceSummaryCard() {
+  const { user } = useAuth()
+  const finance = useFinance(user?.id)
+
+  if (finance.isLoading) return <FinanceSummaryState detail="Cargando movimientos…" value="Cargando…" />
+  if (finance.error || !finance.data) return <FinanceSummaryState detail="No se pudieron cargar las finanzas." value="No disponible" />
+
+  const summary = financeSummary(finance.data)
+  const confirmed = finance.data.transactions.filter((transaction) => transaction.status === 'confirmed')
+  const hasData = finance.data.accounts.length > 0 || finance.data.transactions.length > 0
+  const hasCurrentMonthData = summary.income !== 0 || summary.expense !== 0
+  const detail = !hasData
+    ? 'Sin cuentas ni movimientos.'
+    : hasCurrentMonthData
+      ? `Ingresos: ${fromMinor(summary.income)} · Gastos: ${fromMinor(summary.expense)} · Balance: ${fromMinor(summary.balance)}`
+      : confirmed.length
+        ? 'Sin movimientos confirmados este mes.'
+        : 'Solo hay movimientos pendientes; no afectan los totales.'
+
+  return <NavLink aria-label={`Ver Finanzas: saldo total ${fromMinor(summary.total)}`} className="summary-card summary-card--sky" to="/finanzas"><div className="summary-card-header"><span className="pillar-icon"><CircleDollarSign size={19} /></span><TrendingUp aria-hidden="true" className="trend-icon" size={17} /></div><p>Finanzas</p><strong>{hasData ? `Saldo total: ${fromMinor(summary.total)}` : 'Sin datos'}</strong><span className="summary-status"><i />{detail}</span><span aria-hidden="true" className="mini-progress"><i /></span></NavLink>
+}
+
+function FinanceSummaryState({ detail, value }: { detail: string; value: string }) {
+  return <NavLink aria-label={`Ver Finanzas: ${value}`} className="summary-card summary-card--sky" to="/finanzas"><div className="summary-card-header"><span className="pillar-icon"><CircleDollarSign size={19} /></span><TrendingUp aria-hidden="true" className="trend-icon" size={17} /></div><p>Finanzas</p><strong>{value}</strong><span className="summary-status"><i />{detail}</span><span aria-hidden="true" className="mini-progress"><i /></span></NavLink>
 }
 
 function ChartCard({ children, className = '', status, title }: { children: ReactNode; className?: string; status: string; title: string }) {
