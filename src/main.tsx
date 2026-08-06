@@ -7,7 +7,7 @@ import App from './App'
 import './styles.css'
 
 registerSW({ immediate: true })
-const queryClient = new QueryClient()
+const queryClient = new QueryClient({ defaultOptions: { queries: { staleTime: 30_000, retry: false } } })
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

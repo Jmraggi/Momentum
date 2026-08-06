@@ -31,12 +31,12 @@ import { getCheckinSummary, useDailyCheckinData } from './health/dailyCheckinDat
 import { useWorkouts, workoutSummary } from './health/workoutData'
 import { goalProgress, useGoals } from './health/goalData'
 import { HabitsPage } from './habits/HabitsPage'
-import { habitSummary, useHabits } from './habits/habits'
+import { getDailySummary, useHabits } from './habits/habits'
 import { ProjectsPage } from './projects/ProjectsPage'
 import { ProjectDetail } from './projects/ProjectDetail'
 import { FinancePage } from './finance/FinancePage'
 import { currentFinanceMonth, financeSummary, fromMinor, useFinance } from './finance/finance'
-import { projectProgress, useProjects } from './projects/projects'
+import { useProjects } from './projects/projects'
 
 type IconComponent = typeof Home
 
@@ -88,7 +88,6 @@ const pillars: Pillar[] = [
 const weeklyData: WeeklyPoint[] = []
 const habitData: HabitPoint[] = []
 const activityData: ActivityPoint[] = []
-const dashboardNow = Date.now()
 
 function App() {
   return <AuthProvider><Routes><Route path="/acceso" element={<GuestRoute><AuthPage /></GuestRoute>} /><Route path="*" element={<ProtectedRoute><MomentumApp /></ProtectedRoute>} /></Routes></AuthProvider>
@@ -195,7 +194,7 @@ function Dashboard() {
     <section aria-labelledby="today-title" className="today-section">
       <div className="today-card"><div className="today-title"><span className="today-icon"><Activity size={19} /></span><div><p className="eyebrow">En foco</p><h2 id="today-title">Hoy</h2></div></div><p>Sin registros para hoy.</p><button className="text-button" type="button">Registrar <ChevronRight size={17} /></button></div>
     </section>
-    <section aria-labelledby="pillars-title"><div className="section-heading"><div><p className="eyebrow">Tus pilares</p><h2 id="pillars-title">Resumen</h2></div></div><div className="summary-grid"><HealthSummaryCard /><FinanceSummaryCard />{pillars.filter((pillar) => pillar.title !== 'Salud' && pillar.title !== 'Finanzas').map(({ icon: Icon, title, path, tone }) => <NavLink aria-label={`Ver ${title}: sin datos`} className={`summary-card summary-card--${tone}`} key={path} to={path}><div className="summary-card-header"><span className="pillar-icon"><Icon size={19} /></span><TrendingUp aria-hidden="true" className="trend-icon" size={17} /></div><p>{title}</p><strong>{title === 'Proyectos' ? '0 activos' : title === 'Hábitos' ? '0 de 0' : 'Sin datos'}</strong><span className="summary-status"><i />Sin actividad</span><span aria-hidden="true" className="mini-progress"><i /></span></NavLink>)}</div></section>
+    <section aria-labelledby="pillars-title"><div className="section-heading"><div><p className="eyebrow">Tus pilares</p><h2 id="pillars-title">Resumen</h2></div></div><div className="summary-grid"><HealthSummaryCard /><FinanceSummaryCard /><ProjectsPillarCard /><HabitsPillarCard /></div></section>
     <EisenhowerWidget />
     <section aria-labelledby="charts-title" className="charts-section"><div className="section-heading"><div><p className="eyebrow">Vista general</p><h2 id="charts-title">Actividad</h2></div><span className="section-status">Sin datos este período</span></div><div className="charts-grid"><ChartCard className="chart-card--wide" title="Evolución semanal" status="Sin registros"><WeeklyChart /></ChartCard><ChartCard title="Cumplimiento de hábitos" status="0 de 0"><HabitsChart /></ChartCard><ChartCard title="Actividad por pilar" status="Sin datos"><ActivityChart /></ChartCard></div></section>
     <section className="dashboard-columns"><ProjectsSummary /><HabitsSummary /><HealthGoalsSummary /></section>
@@ -206,11 +205,20 @@ function ProjectsSummary() {
   const { user } = useAuth(); const query = useProjects(user?.id)
   if (query.isLoading) return <CompactPanel icon={<FolderKanban size={19}/>} title="Proyectos" value="Cargando…" detail="" />
   if (query.error || !query.data) return <CompactPanel icon={<FolderKanban size={19}/>} title="Proyectos" value="No disponibles" detail="No se pudieron cargar los proyectos." />
-  const active = query.data.projects.filter((project) => project.status === 'active'); const projectTasks = query.data.tasks; const pending = projectTasks.filter((task) => task.status !== 'completed'); const overdue = pending.filter((task) => task.due_at && new Date(task.due_at).getTime() < dashboardNow)
-  return <section className="compact-panel"><div className="compact-panel-heading"><span className="empty-icon"><FolderKanban size={19}/></span><div><h2>Proyectos</h2><strong>{active.length} activos · {pending.length} pendientes</strong></div></div>{active.length ? <ul className="dashboard-goals">{active.slice(0, 3).map((project) => { const progress = projectProgress(project, projectTasks); return <li key={project.id}><NavLink to={`/proyectos/${project.id}`}><span>{project.name}</span><strong>{progress.completed}/{progress.total} tareas · {progress.percent.toFixed(0)}%</strong></NavLink></li> })}</ul> : <p>Todavía no hay proyectos activos.</p>}<p>{overdue.length ? `${overdue.length} tareas vencidas` : 'Sin tareas vencidas'}</p></section>
+  const active = query.data.filter((project) => project.status === 'active')
+  return <section className="compact-panel"><div className="compact-panel-heading"><span className="empty-icon"><FolderKanban size={19}/></span><div><h2>Proyectos</h2><strong>{active.length} activos</strong></div></div>{active.length ? <ul className="dashboard-goals">{active.slice(0, 3).map((project) => <li key={project.id}><NavLink to={`/proyectos/${project.id}`}><span>{project.name}</span><strong>{project.due_date ? `Vence ${project.due_date}` : 'Sin fecha límite'}</strong></NavLink></li>)}</ul> : <p>Todavía no hay proyectos activos.</p>}</section>
 }
 
-function HabitsSummary() { const { user } = useAuth(); const habits = useHabits(user?.id); if (habits.isLoading) return <CompactPanel icon={<ClipboardList size={19}/>} title="Hábitos" value="Cargando…" detail="" />; if (habits.error || !habits.data) return <CompactPanel icon={<ClipboardList size={19}/>} title="Hábitos" value="No disponibles" detail="No se pudieron cargar." />; const summary = habitSummary(habits.data.habits, habits.data.entries); return <NavLink className="compact-panel" to="/habitos"><div className="compact-panel-heading"><span className="empty-icon"><ClipboardList size={19}/></span><div><h2>Hábitos</h2><strong>{summary.completed}/{summary.active.length} completados</strong></div></div><p>{summary.active.length - summary.completed} pendientes hoy · {summary.weeklyPercent.toFixed(0)}% semanal</p></NavLink> }
+function ProjectsPillarCard() {
+  const { user } = useAuth(); const query = useProjects(user?.id)
+  const active = query.data?.filter((project) => project.status === 'active').length
+  const value = query.isLoading ? 'Cargando…' : query.error ? 'No disponible' : `${active ?? 0} activos`
+  return <NavLink aria-label={`Ver Proyectos: ${value}`} className="summary-card summary-card--violet" to="/proyectos"><div className="summary-card-header"><span className="pillar-icon"><FolderKanban size={19} /></span><TrendingUp aria-hidden="true" className="trend-icon" size={17} /></div><p>Proyectos</p><strong>{value}</strong><span className="summary-status"><i />{active ? 'En ejecución' : 'Sin actividad'}</span><span aria-hidden="true" className="mini-progress"><i style={{ width: active ? '100%' : '0%' }} /></span></NavLink>
+}
+
+function HabitsSummary() { const { user } = useAuth(); const habits = useHabits(user?.id); if (habits.isLoading) return <CompactPanel icon={<ClipboardList size={19}/>} title="Hábitos" value="Cargando…" detail="" />; if (habits.error || !habits.data) return <CompactPanel icon={<ClipboardList size={19}/>} title="Hábitos" value="No disponibles" detail="No se pudieron cargar." />; const summary = getDailySummary(habits.data.habits, habits.data.entries, habits.data.pauses); return <NavLink className="compact-panel" to="/habitos"><div className="compact-panel-heading"><span className="empty-icon"><ClipboardList size={19}/></span><div><h2>Hábitos</h2><strong>{summary.completed}/{summary.applicable.length} completados</strong></div></div><p>{summary.score.toFixed(0)}% de puntuación hoy · {summary.applicable.length - summary.completed} pendientes</p></NavLink> }
+
+function HabitsPillarCard() { const { user } = useAuth(); const habits = useHabits(user?.id); const summary = habits.data ? getDailySummary(habits.data.habits, habits.data.entries, habits.data.pauses) : null; const value = habits.isLoading ? 'Cargando…' : habits.error || !summary ? 'No disponible' : `${summary.completed} de ${summary.applicable.length}`; return <NavLink aria-label={`Ver Hábitos: ${value}`} className="summary-card summary-card--teal" to="/habitos"><div className="summary-card-header"><span className="pillar-icon"><ClipboardList size={19} /></span><TrendingUp aria-hidden="true" className="trend-icon" size={17} /></div><p>Hábitos</p><strong>{value}</strong><span className="summary-status"><i />{summary ? `${summary.score.toFixed(0)}% de puntuación hoy` : 'Sin actividad'}</span><span aria-hidden="true" className="mini-progress"><i style={{ width: `${summary?.score ?? 0}%` }} /></span></NavLink> }
 
 function HealthGoalsSummary() {
   const { user } = useAuth(); const goals = useGoals(user?.id); const weight = useWeightData(user?.id); const workouts = useWorkouts(user?.id)
