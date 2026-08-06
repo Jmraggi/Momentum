@@ -35,7 +35,7 @@ import { habitSummary, useHabits } from './habits/habits'
 import { ProjectsPage } from './projects/ProjectsPage'
 import { ProjectDetail } from './projects/ProjectDetail'
 import { FinancePage } from './finance/FinancePage'
-import { financeSummary, fromMinor, useFinance } from './finance/finance'
+import { currentFinanceMonth, financeSummary, fromMinor, useFinance } from './finance/finance'
 import { projectProgress, useProjects } from './projects/projects'
 
 type IconComponent = typeof Home
@@ -230,24 +230,27 @@ function HealthSummaryCard() {
 
 function FinanceSummaryCard() {
   const { user } = useAuth()
-  const finance = useFinance(user?.id)
+  const finance = useFinance(user?.id, currentFinanceMonth())
 
   if (finance.isLoading) return <FinanceSummaryState detail="Cargando movimientos…" value="Cargando…" />
   if (finance.error || !finance.data) return <FinanceSummaryState detail="No se pudieron cargar las finanzas." value="No disponible" />
 
-  const summary = financeSummary(finance.data)
+  const summary = financeSummary(finance.data, currentFinanceMonth())
   const confirmed = finance.data.transactions.filter((transaction) => transaction.status === 'confirmed')
+  const hideAmounts = finance.data.preferences?.hide_amounts ?? false
   const hasData = finance.data.accounts.length > 0 || finance.data.transactions.length > 0
   const hasCurrentMonthData = summary.income !== 0 || summary.expense !== 0
-  const detail = !hasData
+  const detail = hideAmounts
+    ? 'Importes ocultos por privacidad.'
+    : !hasData
     ? 'Sin cuentas ni movimientos.'
     : hasCurrentMonthData
-      ? `Ingresos: ${fromMinor(summary.income)} · Gastos: ${fromMinor(summary.expense)} · Balance: ${fromMinor(summary.balance)}`
+      ? `Ingresos: ${fromMinor(summary.income)} · Gastos: ${fromMinor(summary.expense)} · Balance: ${fromMinor(summary.net)}`
       : confirmed.length
         ? 'Sin movimientos confirmados este mes.'
         : 'Solo hay movimientos pendientes; no afectan los totales.'
 
-  return <NavLink aria-label={`Ver Finanzas: saldo total ${fromMinor(summary.total)}`} className="summary-card summary-card--sky" to="/finanzas"><div className="summary-card-header"><span className="pillar-icon"><CircleDollarSign size={19} /></span><TrendingUp aria-hidden="true" className="trend-icon" size={17} /></div><p>Finanzas</p><strong>{hasData ? `Saldo total: ${fromMinor(summary.total)}` : 'Sin datos'}</strong><span className="summary-status"><i />{detail}</span><span aria-hidden="true" className="mini-progress"><i /></span></NavLink>
+  return <NavLink aria-label={hideAmounts ? 'Ver Finanzas: importes ocultos' : `Ver Finanzas: saldo total ${fromMinor(summary.total)}`} className="summary-card summary-card--sky" to="/finanzas"><div className="summary-card-header"><span className="pillar-icon"><CircleDollarSign size={19} /></span><TrendingUp aria-hidden="true" className="trend-icon" size={17} /></div><p>Finanzas</p><strong>{hideAmounts ? 'Importes ocultos' : hasData ? `Saldo total: ${fromMinor(summary.total)}` : 'Sin datos'}</strong><span className="summary-status"><i />{detail}</span><span aria-hidden="true" className="mini-progress"><i /></span></NavLink>
 }
 
 function FinanceSummaryState({ detail, value }: { detail: string; value: string }) {
