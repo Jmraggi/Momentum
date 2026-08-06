@@ -22,6 +22,7 @@ import { useState, type ReactNode } from 'react'
 import { NavLink, Navigate, Route, Routes } from 'react-router-dom'
 import { Bar, BarChart, CartesianGrid, Cell, Line, LineChart, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { AuthPage } from './auth/AuthPage'
+import { PasswordRecoveryPage } from './auth/PasswordRecoveryPage'
 import { AuthProvider, useAuth } from './auth/AuthProvider'
 import { TasksBoard } from './tasks/TasksBoard'
 import { EisenhowerWidget } from './tasks/EisenhowerWidget'
@@ -35,6 +36,7 @@ import { getDailySummary, useHabits } from './habits/habits'
 import { ProjectsPage } from './projects/ProjectsPage'
 import { ProjectDetail } from './projects/ProjectDetail'
 import { FinancePage } from './finance/FinancePage'
+import { HomeDashboard } from './home/HomeDashboard'
 import { currentFinanceMonth, financeSummary, fromMinor, useFinance } from './finance/finance'
 import { useProjects } from './projects/projects'
 
@@ -90,7 +92,7 @@ const habitData: HabitPoint[] = []
 const activityData: ActivityPoint[] = []
 
 function App() {
-  return <AuthProvider><Routes><Route path="/acceso" element={<GuestRoute><AuthPage /></GuestRoute>} /><Route path="*" element={<ProtectedRoute><MomentumApp /></ProtectedRoute>} /></Routes></AuthProvider>
+  return <AuthProvider><Routes><Route path="/restablecer" element={<PasswordRecoveryPage />} /><Route path="/acceso" element={<GuestRoute><AuthPage /></GuestRoute>} /><Route path="*" element={<ProtectedRoute><MomentumApp /></ProtectedRoute>} /></Routes></AuthProvider>
 }
 
 function ProtectedRoute({ children }: { children: ReactNode }) {
@@ -168,7 +170,7 @@ function MomentumApp() {
         </header>
         <Routes>
           <Route path="/" element={<Navigate replace to="/inicio" />} />
-          <Route path="/inicio" element={<Dashboard />} />
+          <Route path="/inicio" element={<HomeDashboard />} />
           <Route path="/salud" element={<HealthDashboard />} />
           <Route path="/habitos" element={<HabitsPage />} />
           <Route path="/proyectos" element={<ProjectsPage />} />
@@ -188,6 +190,7 @@ function PageHeader({ eyebrow, title, description, action }: { eyebrow: string; 
   return <header className="page-header"><div><p className="eyebrow">{eyebrow}</p><h1>{title}</h1><p className="page-description">{description}</p></div>{action}</header>
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function Dashboard() {
   return <div className="page dashboard">
     <PageHeader eyebrow="Resumen personal" title="Inicio" description="Tu panorama de hoy." action={<button className="primary-button" type="button"><Plus size={18} />Registrar</button>} />

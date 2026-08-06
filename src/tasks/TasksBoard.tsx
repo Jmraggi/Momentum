@@ -2,6 +2,7 @@ import { DndContext, DragOverlay, KeyboardSensor, MouseSensor, useDraggable, use
 import { Check, ChevronDown, Clock3, GripVertical, Pencil, Plus, Trash2, X } from 'lucide-react'
 import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react'
 import { useAuth } from '../auth/AuthProvider'
+import { useLocation } from 'react-router-dom'
 import { useProjects } from '../projects/projects'
 import { filterPriorityTasks, findTaskQuadrant, isTaskOverdue, isTaskInQuadrant, taskQuadrants, type Task, type TaskInput, type TaskPillarFilter, type TaskQuadrant, type TaskStateFilter, useTaskMutations, useTasks } from './tasks'
 
@@ -14,7 +15,8 @@ function useDesktop() { const [desktop, setDesktop] = useState(() => window.matc
 
 export function TasksBoard() {
   const { user } = useAuth(); const tasksQuery = useTasks(user?.id); const projectsQuery = useProjects(user?.id); const mutations = useTaskMutations(user?.id); const desktop = useDesktop()
-  const [editingTask, setEditingTask] = useState<Task | null>(null); const [creatingQuadrant, setCreatingQuadrant] = useState<TaskQuadrant | null>(null); const [pillar, setPillar] = useState<TaskPillarFilter>('all'); const [state, setState] = useState<TaskStateFilter>('active'); const [includePausedProjects, setIncludePausedProjects] = useState(false); const [activeTone, setActiveTone] = useState<TaskQuadrant['tone']>('now'); const [draggedTask, setDraggedTask] = useState<Task | null>(null); const [announcement, setAnnouncement] = useState('')
+  const location = useLocation()
+  const [editingTask, setEditingTask] = useState<Task | null>(null); const [creatingQuadrant, setCreatingQuadrant] = useState<TaskQuadrant | null>(() => (location.state as { openAction?: string } | null)?.openAction === 'task' ? taskQuadrants[0] : null); const [pillar, setPillar] = useState<TaskPillarFilter>('all'); const [state, setState] = useState<TaskStateFilter>('active'); const [includePausedProjects, setIncludePausedProjects] = useState(false); const [activeTone, setActiveTone] = useState<TaskQuadrant['tone']>('now'); const [draggedTask, setDraggedTask] = useState<Task | null>(null); const [announcement, setAnnouncement] = useState('')
   const tasks = tasksQuery.data ?? []
   const visibleTasks = useMemo(() => filterPriorityTasks(tasksQuery.data ?? [], projectsQuery.data ?? [], { pillar, state, includePausedProjects }), [tasksQuery.data, projectsQuery.data, pillar, state, includePausedProjects])
   const sensors = useSensors(useSensor(MouseSensor, { activationConstraint: { distance: 6 } }), useSensor(KeyboardSensor))

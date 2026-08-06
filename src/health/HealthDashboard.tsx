@@ -1,6 +1,7 @@
 import { Activity, Droplets, Dumbbell, Footprints, HeartPulse, Moon, Scale, TrendingUp, Zap } from 'lucide-react'
 import { Bar, BarChart, CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { useState, type CSSProperties, type FormEvent, type ReactNode } from 'react'
+import { useLocation } from 'react-router-dom'
 import { useAuth } from '../auth/AuthProvider'
 import { DailyCheckin } from './DailyCheckin'
 import { Goals } from './Goals'
@@ -21,7 +22,7 @@ function weeklyWorkouts(data: HealthDashboardData) { return data.workouts.filter
 function exerciseDays(data: HealthDashboardData) { return new Set(data.workouts.map((item) => dateKey(item.started_at))) }
 
 export function HealthDashboard() {
-  const { user } = useAuth(); const [period, setPeriod] = useState<Period>(30); const [weightSignal, setWeightSignal] = useState(0); const [workoutSignal, setWorkoutSignal] = useState(0); const [checkinSignal, setCheckinSignal] = useState(0); const [historyOpen, setHistoryOpen] = useState(false); const query = useHealthDashboard(user?.id, period); const metricMutation = useDailyMetricMutation(user?.id)
+  const { user } = useAuth(); const location = useLocation(); const requestedAction = (location.state as { openAction?: string } | null)?.openAction; const [period, setPeriod] = useState<Period>(30); const [weightSignal, setWeightSignal] = useState(() => requestedAction === 'weight' ? 1 : 0); const [workoutSignal, setWorkoutSignal] = useState(() => requestedAction === 'workout' ? 1 : 0); const [checkinSignal, setCheckinSignal] = useState(0); const [historyOpen, setHistoryOpen] = useState(() => requestedAction === 'weight'); const query = useHealthDashboard(user?.id, period); const metricMutation = useDailyMetricMutation(user?.id)
   if (query.isLoading) return <main className="page"><div className="tasks-state">Cargando tu dashboard de Salud…</div></main>
   if (query.error || !query.data) return <main className="page"><div className="tasks-state tasks-state--error">No se pudo cargar Salud. Intentá de nuevo.</div></main>
   const data = query.data; const settings = settingsFor(data); const weight = latest(data, 'body_weight'); const weightEntries = entriesFor(data, 'body_weight'); const previous = weightEntries[1]; const weightDelta = number(weight) !== null && number(previous) !== null ? number(weight)! - number(previous)! : null

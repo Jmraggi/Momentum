@@ -4,7 +4,7 @@ import { supabase } from '../lib/supabase'
 import type { Database } from '../types/database'
 
 type Profile = Database['public']['Tables']['profiles']['Row']
-interface AuthContextValue { session: Session | null; user: User | null; profile: Profile | null; isLoading: boolean; signOut: () => Promise<void> }
+interface AuthContextValue { session: Session | null; user: User | null; profile: Profile | null; isLoading: boolean; signOut: () => Promise<void>; updateDisplayName: (displayName: string) => Promise<void> }
 const AuthContext = createContext<AuthContextValue | null>(null)
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -36,7 +36,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const signOut = async () => { await supabase.auth.signOut() }
-  return <AuthContext.Provider value={{ session, user: session?.user ?? null, profile, isLoading, signOut }}>{children}</AuthContext.Provider>
+  const updateDisplayName = async (displayName: string) => {
+    if (!session) return
+    const { data, error } = await supabase.from('profiles').update({ display_name: displayName.trim() || null }).eq('id', session.user.id).select().single()
+    if (error) throw new Error(error.message)
+    setProfile(data)
+  }
+  return <AuthContext.Provider value={{ session, user: session?.user ?? null, profile, isLoading, signOut, updateDisplayName }}>{children}</AuthContext.Provider>
 }
 
 // eslint-disable-next-line react-refresh/only-export-components

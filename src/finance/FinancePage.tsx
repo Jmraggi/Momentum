@@ -2,15 +2,17 @@ import { useMemo, useState, type FormEvent } from 'react'
 import { AlertCircle, ArrowDownRight, ArrowUpRight, CalendarDays, Eye, EyeOff, Landmark, PiggyBank, Plus, WalletCards } from 'lucide-react'
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from 'recharts'
 import { useAuth } from '../auth/AuthProvider'
+import { useLocation } from 'react-router-dom'
 import { currentFinanceMonth, financeDateMonth, financeSummary, formatMoney, fromMinor, toMinor, useFinance, useFinanceMutations, type Account, type Category, type Transaction } from './finance'
 
 const donutColors = ['#60a5fa', '#818cf8', '#38bdf8', '#2dd4bf', '#fbbf24', '#fb7185']
 
 export function FinancePage() {
   const { user } = useAuth()
+  const location = useLocation()
   const [month, setMonth] = useState(currentFinanceMonth)
   const [editing, setEditing] = useState<Transaction | null>(null)
-  const [open, setOpen] = useState(false)
+  const [open, setOpen] = useState(() => (location.state as { openAction?: string } | null)?.openAction === 'transaction')
   const [statusFilter, setStatusFilter] = useState<'all' | 'confirmed' | 'pending'>('all')
   const query = useFinance(user?.id, month)
   const mutations = useFinanceMutations(user?.id, month)

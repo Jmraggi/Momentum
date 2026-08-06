@@ -1,18 +1,17 @@
-import { LockKeyhole, LogIn, UserPlus } from 'lucide-react'
+import { Globe2, KeyRound, LockKeyhole, LogIn, Mail, UserPlus } from 'lucide-react'
 import { useState, type FormEvent } from 'react'
 import { supabase } from '../lib/supabase'
 
+type AuthMode = 'login' | 'register' | 'recover'
+
+const authError = (message: string) => /invalid login credentials/i.test(message) ? 'El correo o la contraseña no son correctos.' : /already registered/i.test(message) ? 'Ya existe una cuenta con ese correo.' : /email not confirmed/i.test(message) ? 'Confirmá tu correo antes de iniciar sesión.' : message
+
 export function AuthPage() {
-  const [isRegistering, setIsRegistering] = useState(false)
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
-  const [message, setMessage] = useState('')
-  const [isSubmitting, setIsSubmitting] = useState(false)
-  const submit = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault(); setMessage(''); setIsSubmitting(true)
-    const result = isRegistering ? await supabase.auth.signUp({ email, password }) : await supabase.auth.signInWithPassword({ email, password })
-    setIsSubmitting(false)
-    setMessage(result.error ? result.error.message : isRegistering ? 'Cuenta creada. Ya podés continuar.' : '')
-  }
-  return <main className="auth-page"><section className="auth-card"><div className="auth-mark"><LockKeyhole size={25} /></div><p className="eyebrow">Momentum</p><h1>{isRegistering ? 'Creá tu cuenta' : 'Bienvenido de nuevo'}</h1><p>{isRegistering ? 'Empezá a organizar lo importante.' : 'Ingresá para continuar con tu espacio.'}</p><form onSubmit={submit}><label>Correo electrónico<input autoComplete="email" onChange={(event) => setEmail(event.target.value)} required type="email" value={email} /></label><label>Contraseña<input autoComplete={isRegistering ? 'new-password' : 'current-password'} minLength={6} onChange={(event) => setPassword(event.target.value)} required type="password" value={password} /></label>{message && <p aria-live="polite" className="auth-message">{message}</p>}<button className="primary-button" disabled={isSubmitting} type="submit">{isRegistering ? <UserPlus size={18} /> : <LogIn size={18} />}{isSubmitting ? 'Procesando…' : isRegistering ? 'Crear cuenta' : 'Iniciar sesión'}</button></form><button className="auth-switch" onClick={() => { setIsRegistering(!isRegistering); setMessage('') }} type="button">{isRegistering ? 'Ya tengo una cuenta' : 'Quiero crear una cuenta'}</button></section></main>
+  const [mode, setMode] = useState<AuthMode>('login'); const [email, setEmail] = useState(''); const [password, setPassword] = useState(''); const [message, setMessage] = useState(''); const [isSubmitting, setIsSubmitting] = useState(false)
+  const isRegistering = mode === 'register'; const isRecovery = mode === 'recover'
+  const changeMode = (next: AuthMode) => { setMode(next); setMessage(''); setPassword('') }
+  const submit = async (event: FormEvent<HTMLFormElement>) => { event.preventDefault(); setMessage(''); setIsSubmitting(true); try { if (isRecovery) { const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo: `${window.location.origin}/restablecer` }); if (error) throw error; setMessage('Si existe una cuenta con este correo, te enviamos un enlace para restablecer la contraseña.'); return }; const result = isRegistering ? await supabase.auth.signUp({ email, password }) : await supabase.auth.signInWithPassword({ email, password }); if (result.error) throw result.error; if (isRegistering && !result.data.session) setMessage('Revisá tu correo para confirmar la cuenta antes de iniciar sesión.') } catch (error) { setMessage(authError(error instanceof Error ? error.message : 'No se pudo procesar la solicitud.')) } finally { setIsSubmitting(false) } }
+  const google = async () => { setMessage(''); setIsSubmitting(true); const { error } = await supabase.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: `${window.location.origin}/inicio` } }); if (error) setMessage(authError(error.message)); setIsSubmitting(false) }
+  const title = isRecovery ? 'Restablecé tu contraseña' : isRegistering ? 'Creá tu cuenta' : 'Bienvenido de nuevo'; const description = isRecovery ? 'Te enviaremos un enlace seguro a tu correo.' : isRegistering ? 'Empezá a organizar lo importante.' : 'Ingresá para continuar con tu espacio.'
+  return <main className="auth-page"><section className="auth-card"><div className="auth-mark"><LockKeyhole size={25} /></div><p className="eyebrow">Momentum</p><h1>{title}</h1><p>{description}</p><form onSubmit={submit}><label>Correo electrónico<input autoComplete="email" onChange={(event) => setEmail(event.target.value)} required type="email" value={email} /></label>{!isRecovery && <label>Contraseña<input autoComplete={isRegistering ? 'new-password' : 'current-password'} minLength={8} onChange={(event) => setPassword(event.target.value)} required type="password" value={password} /></label>}{message && <p aria-live="polite" className="auth-message">{message}</p>}<button className="primary-button" disabled={isSubmitting} type="submit">{isRecovery ? <Mail size={18} /> : isRegistering ? <UserPlus size={18} /> : <LogIn size={18} />}{isSubmitting ? 'Procesando…' : isRecovery ? 'Enviar enlace' : isRegistering ? 'Crear cuenta' : 'Iniciar sesión'}</button></form>{!isRecovery && <><div className="auth-divider"><span />o<span /></div><button className="secondary-button auth-google" disabled={isSubmitting} onClick={() => void google()} type="button"><Globe2 size={18} />Continuar con Google</button></>}{mode === 'login' && <button className="auth-switch" onClick={() => changeMode('recover')} type="button"><KeyRound size={15} />Olvidé mi contraseña</button>}<button className="auth-switch" onClick={() => changeMode(mode === 'register' ? 'login' : 'register')} type="button">{isRegistering ? 'Ya tengo una cuenta' : 'Quiero crear una cuenta'}</button></section></main>
 }
