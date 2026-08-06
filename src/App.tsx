@@ -25,7 +25,7 @@ import { AuthPage } from './auth/AuthPage'
 import { AuthProvider, useAuth } from './auth/AuthProvider'
 import { TasksBoard } from './tasks/TasksBoard'
 import { EisenhowerWidget } from './tasks/EisenhowerWidget'
-import { WeightPage } from './health/WeightPage'
+import { HealthDashboard } from './health/HealthDashboard'
 import { useWeightData, weightDifference } from './health/weight'
 import { getCheckinSummary, useDailyCheckinData } from './health/dailyCheckinData'
 import { useWorkouts, workoutSummary } from './health/workoutData'
@@ -170,7 +170,7 @@ function MomentumApp() {
         <Routes>
           <Route path="/" element={<Navigate replace to="/inicio" />} />
           <Route path="/inicio" element={<Dashboard />} />
-          <Route path="/salud" element={<WeightPage />} />
+          <Route path="/salud" element={<HealthDashboard />} />
           <Route path="/habitos" element={<HabitsPage />} />
           <Route path="/proyectos" element={<ProjectsPage />} />
           <Route path="/proyectos/:id" element={<ProjectDetail />} />

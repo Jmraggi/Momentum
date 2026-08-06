@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../lib/supabase'
 import type { Database, Json } from '../types/database'
+import { healthKeys } from './dashboardData'
 
 export type WeightEntry = Database['public']['Tables']['metric_entries']['Row']
 export type WeightMetric = Database['public']['Tables']['metrics']['Row']
@@ -18,7 +19,7 @@ async function getWeightData(userId: string): Promise<WeightData> {
 }
 export function useWeightData(userId: string | undefined) { return useQuery({ queryKey: weightKey(userId ?? ''), enabled: Boolean(userId), queryFn: () => getWeightData(userId!), retry: false }) }
 export function useWeightMutations(userId: string | undefined) {
-  const client = useQueryClient(); const invalidate = async () => { if (userId) await client.invalidateQueries({ queryKey: weightKey(userId) }) }
+  const client = useQueryClient(); const invalidate = async () => { if (userId) { await client.invalidateQueries({ queryKey: weightKey(userId) }); await client.invalidateQueries({ queryKey: healthKeys.root(userId) }) } }
   const manualSource = async (): Promise<{ id: string }> => { const result = await supabase.from('data_sources').select('id').eq('user_id', userId!).eq('source_type', 'manual').maybeSingle(); if (result.error) throw new Error(result.error.message); if (!result.data) throw new Error('No se encontró la fuente manual del usuario.'); return result.data }
   const metadata = (note: string): Json => note ? { note } : {}
   const initialize = useMutation({ mutationFn: async () => { const created = await supabase.from('metrics').upsert({ user_id: userId!, slug: 'body_weight', name: 'Peso corporal', pillar: 'health', data_type: 'numeric', unit: 'kg', aggregation: 'latest' }, { onConflict: 'user_id,slug', ignoreDuplicates: true }).select().maybeSingle(); if (created.error) throw new Error(created.error.message); if (created.data) return created.data; return requireData(await supabase.from('metrics').select('*').eq('user_id', userId!).eq('slug', 'body_weight').maybeSingle()) }, onSuccess: invalidate, retry: false })
