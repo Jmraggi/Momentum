@@ -65,14 +65,19 @@ export function useDailyMetricMutation(userId: string | undefined) {
   const client = useQueryClient()
   return useMutation({
     retry: false,
-    mutationFn: async ({ slug, value, date = healthToday() }: { slug: 'water_ml' | 'steps'; value: number; date?: string }) => {
+    mutationFn: async ({ slug, value, date = healthToday() }: { slug: 'water_ml' | 'steps'; value: number | null; date?: string }) => {
       const definition = metricDefinitions.find((item) => item.slug === slug)
-      if (!definition || !Number.isFinite(value) || value < definition.min || value > definition.max) throw new Error('Valor inválido.')
+      if (!definition || (value !== null && (!Number.isFinite(value) || value < definition.min || value > definition.max))) throw new Error('Valor inválido.')
       const metrics = required(await supabase.from('metrics').upsert({ user_id: userId!, slug, name: definition.name, pillar: 'health', data_type: 'numeric', unit: definition.unit, aggregation: 'latest' }, { onConflict: 'user_id,slug', ignoreDuplicates: true }).select('*'))
       const metric = metrics[0] ?? required(await supabase.from('metrics').select('*').eq('user_id', userId!).eq('slug', slug).single())
       const sourceResult = await supabase.from('data_sources').select('id').eq('user_id', userId!).eq('source_type', 'manual').maybeSingle()
       if (sourceResult.error) throw new Error(sourceResult.error.message)
       if (!sourceResult.data) throw new Error('No se encontró la fuente manual.')
+      if (value === null) {
+        const removed = await supabase.from('metric_entries').delete().eq('user_id', userId!).eq('metric_id', metric.id).eq('check_in_date', date).eq('data_source_id', sourceResult.data.id)
+        if (removed.error) throw new Error(removed.error.message)
+        return null
+      }
       return required(await supabase.from('metric_entries').upsert({ user_id: userId!, metric_id: metric.id, data_source_id: sourceResult.data.id, numeric_value: value, recorded_at: new Date(`${date}T12:00:00`).toISOString(), check_in_date: date, metadata: { slug } }, { onConflict: 'user_id,metric_id,check_in_date' }).select().single())
     },
     onSuccess: async () => { if (userId) await client.invalidateQueries({ queryKey: healthKeys.root(userId) }) },

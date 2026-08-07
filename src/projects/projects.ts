@@ -64,7 +64,7 @@ export function useProjectMutations(userId: string | undefined) {
   const client = useQueryClient()
   const invalidate = async () => { if (userId) { await client.invalidateQueries({ queryKey: projectKeys.all(userId) }); await client.invalidateQueries({ queryKey: taskKeys.all(userId) }) } }
   return {
-    create: useMutation({ mutationFn: async (input: ProjectInput) => need(await supabase.from('projects').insert({ ...input, user_id: userId!, progress_mode: 'tasks' }).select().single()), onSuccess: invalidate }),
+    create: useMutation({ mutationFn: async (input: ProjectInput) => need<Project>(await supabase.from('projects').insert({ ...input, user_id: userId!, progress_mode: 'tasks' }).select().single()), onSuccess: invalidate }),
     update: useMutation({ mutationFn: async ({ id, input }: { id: string; input: ProjectInput }) => need(await supabase.from('projects').update(input).eq('id', id).eq('user_id', userId!).select().single()), onSuccess: invalidate }),
     setStatus: useMutation({ mutationFn: async ({ id, status }: { id: string; status: string }) => need(await supabase.from('projects').update({ status, completed_at: status === 'completed' ? new Date().toISOString() : null }).eq('id', id).eq('user_id', userId!).select().single()), onSuccess: invalidate }),
     remove: useMutation({ mutationFn: async (id: string) => need(await supabase.from('projects').delete().eq('id', id).eq('user_id', userId!).select('id').single()), onSuccess: invalidate }),

@@ -39,6 +39,7 @@ import { FinancePage } from './finance/FinancePage'
 import { HomeDashboard } from './home/HomeDashboard'
 import { currentFinanceMonth, financeSummary, fromMinor, useFinance } from './finance/finance'
 import { useProjects } from './projects/projects'
+import { QuickEntryLauncher, UndoToastProvider } from './quick-actions/QuickActions'
 
 type IconComponent = typeof Home
 
@@ -126,7 +127,7 @@ function MomentumApp() {
   }
 
   return (
-    <div className={`app-shell ${isSidebarCollapsed ? 'app-shell--sidebar-collapsed' : ''}`}>
+    <UndoToastProvider><div className={`app-shell ${isSidebarCollapsed ? 'app-shell--sidebar-collapsed' : ''}`}>
       <aside className={`sidebar ${isMenuOpen ? 'sidebar--open' : ''}`}>
         <div className="brand-row">
           <NavLink aria-label="Ir al inicio" className="brand" to="/inicio" onClick={closeMenu}>
@@ -182,7 +183,8 @@ function MomentumApp() {
           <Route path="*" element={<NotFoundPage />} />
         </Routes>
       </main>
-    </div>
+      <QuickEntryLauncher />
+    </div></UndoToastProvider>
   )
 }
 
