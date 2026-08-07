@@ -1,0 +1,7 @@
+.workout-list-heading { margin-top: 22px; }
+.workout-list-heading h3 { font-size: 15px; margin: 0; }
+.workout-list-heading .text-button { margin: 0; }
+.workout-rpe-quick { align-items: center; color: var(--text-muted); display: inline-flex; font-size: 12px; font-weight: 700; gap: 7px; margin-top: 9px; }
+.workout-rpe-quick select { background: var(--surface-raised); border: 1px solid var(--border-strong); border-radius: 6px; color: var(--text); font: inherit; padding: 4px 6px; }
+.workout-edit-modal { max-height: calc(100vh - 48px); overflow-y: auto; width: min(680px, calc(100vw - 32px)); }
+.workout-edit-modal .task-form { margin: 0; }
