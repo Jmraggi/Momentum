@@ -1,4 +1,4 @@
-import { Activity, Droplets, Dumbbell, Footprints, HeartPulse, Moon, Scale, TrendingUp, Zap } from 'lucide-react'
+import { Activity, Droplets, Dumbbell, Footprints, HeartPulse, Moon, Scale, TrendingUp, Upload, Zap } from 'lucide-react'
 import { Bar, BarChart, CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { useState, type CSSProperties, type FormEvent, type ReactNode } from 'react'
 import { useLocation } from 'react-router-dom'
@@ -8,6 +8,7 @@ import { Goals } from './Goals'
 import { Workouts } from './Workouts'
 import { healthToday, settingsFor, useDailyMetricMutation, useHealthDashboard, type HealthDashboardData, type MetricEntry } from './dashboardData'
 import { WeightPage } from './WeightPage'
+import { AppleHealthImportModal } from './AppleHealthImportModal'
 
 type Period = 30 | 90
 type Slug = 'body_weight' | 'sleep_duration' | 'sleep_quality' | 'energy_level' | 'fatigue_level' | 'water_ml' | 'steps'
@@ -22,13 +23,13 @@ function weeklyWorkouts(data: HealthDashboardData) { return data.workouts.filter
 function exerciseDays(data: HealthDashboardData) { return new Set(data.workouts.map((item) => dateKey(item.started_at))) }
 
 export function HealthDashboard() {
-  const { user } = useAuth(); const location = useLocation(); const requestedAction = (location.state as { openAction?: string } | null)?.openAction; const [period, setPeriod] = useState<Period>(30); const [weightSignal, setWeightSignal] = useState(() => requestedAction === 'weight' ? 1 : 0); const [workoutSignal, setWorkoutSignal] = useState(() => requestedAction === 'workout' ? 1 : 0); const [checkinSignal, setCheckinSignal] = useState(0); const [historyOpen, setHistoryOpen] = useState(() => requestedAction === 'weight'); const query = useHealthDashboard(user?.id, period); const metricMutation = useDailyMetricMutation(user?.id)
+  const { user } = useAuth(); const location = useLocation(); const requestedAction = (location.state as { openAction?: string } | null)?.openAction; const [period, setPeriod] = useState<Period>(30); const [weightSignal, setWeightSignal] = useState(() => requestedAction === 'weight' ? 1 : 0); const [workoutSignal, setWorkoutSignal] = useState(() => requestedAction === 'workout' ? 1 : 0); const [checkinSignal, setCheckinSignal] = useState(0); const [historyOpen, setHistoryOpen] = useState(() => requestedAction === 'weight'); const [importOpen, setImportOpen] = useState(false); const query = useHealthDashboard(user?.id, period); const metricMutation = useDailyMetricMutation(user?.id)
   if (query.isLoading) return <main className="page"><div className="tasks-state">Cargando tu dashboard de Salud…</div></main>
   if (query.error || !query.data) return <main className="page"><div className="tasks-state tasks-state--error">No se pudo cargar Salud. Intentá de nuevo.</div></main>
   const data = query.data; const settings = settingsFor(data); const weight = latest(data, 'body_weight'); const weightEntries = entriesFor(data, 'body_weight'); const previous = weightEntries[1]; const weightDelta = number(weight) !== null && number(previous) !== null ? number(weight)! - number(previous)! : null
-  const sleep = latestCheckin(data, 'sleep_duration'); const energy = latestCheckin(data, 'energy_level'); const water = latest(data, 'water_ml'); const steps = latest(data, 'steps'); const trainings = weeklyWorkouts(data)
+  const sleep = latestCheckin(data, 'sleep_duration'); const energy = latestCheckin(data, 'energy_level'); const water = latest(data, 'water_ml'); const steps = latest(data, 'steps'); const appleToday = data.dailySummaries.find((item) => item.summary_date === healthToday()); const trainings = weeklyWorkouts(data)
   return <main className="page health-dashboard">
-    <header className="page-header"><div><p className="eyebrow">Pilar personal</p><h1>Salud</h1><p className="page-description">Una vista clara de tu estado, entrenamiento y recuperación.</p></div><PeriodSelector period={period} onChange={setPeriod} /></header>
+    <header className="page-header"><div><p className="eyebrow">Pilar personal</p><h1>Salud</h1><p className="page-description">Una vista clara de tu estado, entrenamiento y recuperación.</p></div><div className="health-header-actions"><button className="secondary-button" onClick={() => setImportOpen(true)} type="button"><Upload size={16}/>Importar Apple Salud</button><PeriodSelector period={period} onChange={setPeriod} /></div></header>{importOpen && <AppleHealthImportModal onClose={() => setImportOpen(false)} onComplete={() => query.refetch()}/>} 
     <nav aria-label="Secciones de Salud" className="health-nav"><a href="#estado-actual">Estado actual</a><a href="#tendencias">Tendencias</a><a href="#entrenamiento">Entrenamiento</a><a href="#recuperacion">Recuperación</a></nav>
     <section id="estado-actual"><div className="section-heading"><div><p className="eyebrow">Hoy</p><h2>Estado actual</h2></div></div><div className="health-kpi-grid">
       <Kpi action={() => { setHistoryOpen(true); setWeightSignal((value) => value + 1); setTimeout(() => document.getElementById('historial')?.scrollIntoView({ behavior: 'smooth' }), 0) }} icon={<Scale size={19}/>} label="Último peso" value={weight ? `${number(weight)} kg` : 'Sin registro'} detail={weightDelta === null ? 'Registrá una medición' : `${weightDelta > 0 ? '+' : ''}${weightDelta.toFixed(1)} kg vs. anterior`} tone="blue" />
@@ -36,7 +37,8 @@ export function HealthDashboard() {
       <Kpi action={() => { setCheckinSignal((value) => value + 1); document.getElementById('recuperacion')?.scrollIntoView({ behavior: 'smooth' }) }} icon={<Moon size={19}/>} label="Sueño de anoche" value={sleep ? `${number(sleep)} h` : 'Sin check-in'} detail={sleep?.check_in_date ?? 'Registrá tu descanso'} tone="sky" />
       <Kpi action={() => { setCheckinSignal((value) => value + 1); document.getElementById('recuperacion')?.scrollIntoView({ behavior: 'smooth' }) }} icon={<Zap size={19}/>} label="Energía" value={energy ? `${number(energy)}/5` : 'Sin check-in'} detail={energy?.check_in_date ?? 'Registrá cómo te sentís'} tone="amber" />
       <QuickMetric icon={<Droplets size={19}/>} label="Agua" value={number(water)} goal={settings.water_goal_ml} unit="ml" onSave={(value) => metricMutation.mutateAsync({ slug: 'water_ml', value })} saving={metricMutation.isPending} />
-      <QuickMetric icon={<Footprints size={19}/>} label="Pasos" value={number(steps)} goal={settings.steps_goal} unit="pasos" onSave={(value) => metricMutation.mutateAsync({ slug: 'steps', value })} saving={metricMutation.isPending} />
+      <QuickMetric icon={<Footprints size={19}/>} label="Pasos" value={appleToday ? appleToday.steps : number(steps)} goal={settings.steps_goal} unit="pasos" onSave={(value) => metricMutation.mutateAsync({ slug: 'steps', value })} saving={metricMutation.isPending} />
+      {appleToday && <Kpi icon={<Activity size={19}/>} label="Distancia" value={`${Number(appleToday.walking_running_distance_km).toFixed(1)} km`} detail={`${Number(appleToday.active_energy_kcal).toFixed(0)} kcal activas`} tone="teal" />}
     </div></section>
     <section className="health-section" id="tendencias"><div className="section-heading"><div><p className="eyebrow">Evolución</p><h2>Tendencias</h2></div><span className="section-status">Últimos {period} días</span></div><div className="health-chart-grid"><TrendCard title="Peso" empty="Registrá una medición de peso." data={weightEntries.map((item) => ({ date: item.recorded_at, value: number(item) ?? 0 })).reverse()} unit="kg"/><TrendCard title="Sueño y energía" empty="Completá un check-in diario." data={mergeByDate(entriesFor(data, 'sleep_duration'), entriesFor(data, 'energy_level'))} unit="" multi/><MinutesCard workouts={data.workouts}/><Heatmap data={data}/><CompletionRings data={data}/></div></section>
     <section className="health-section" id="entrenamiento"><div className="section-heading"><div><p className="eyebrow">Movimiento</p><h2>Entrenamiento</h2></div></div><TrainingOverview workouts={data.workouts}/><Workouts key={workoutSignal} openSignal={workoutSignal} /></section>

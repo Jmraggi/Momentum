@@ -6,6 +6,7 @@ export type HealthSettings = Database['public']['Tables']['health_settings']['Ro
 export type Metric = Database['public']['Tables']['metrics']['Row']
 export type MetricEntry = Database['public']['Tables']['metric_entries']['Row']
 export type Workout = Database['public']['Tables']['workouts']['Row']
+export type HealthDailySummary = Database['public']['Tables']['health_daily_summaries']['Row']
 
 const required = <T,>(result: { data: T | null; error: { message: string } | null }): T => {
   if (result.error) throw new Error(result.error.message)
@@ -36,7 +37,7 @@ const defaultSettings: Omit<HealthSettings, 'user_id' | 'created_at' | 'updated_
 const isoDaysAgo = (days: number) => { const value = new Date(); value.setDate(value.getDate() - days); return value.toISOString() }
 export const healthToday = () => new Date().toLocaleDateString('en-CA')
 
-export interface HealthDashboardData { settings: HealthSettings | null; metrics: Metric[]; entries: MetricEntry[]; workouts: Workout[] }
+export interface HealthDashboardData { settings: HealthSettings | null; metrics: Metric[]; entries: MetricEntry[]; workouts: Workout[]; dailySummaries: HealthDailySummary[] }
 
 export function useHealthDashboard(userId: string | undefined, days: number) {
   return useQuery({
@@ -48,11 +49,12 @@ export function useHealthDashboard(userId: string | undefined, days: number) {
       ])
       if (settings.error) throw new Error(settings.error.message)
       const metricRows = required(metrics)
-      const [entries, workouts] = await Promise.all([
+      const [entries, workouts, dailySummaries] = await Promise.all([
         metricRows.length ? supabase.from('metric_entries').select('*').eq('user_id', userId!).in('metric_id', metricRows.map(({ id }) => id)).gte('recorded_at', isoDaysAgo(Math.max(days, 365))).order('recorded_at', { ascending: false }) : Promise.resolve({ data: [], error: null }),
         supabase.from('workouts').select('*').eq('user_id', userId!).gte('started_at', isoDaysAgo(Math.max(days, 365))).order('started_at', { ascending: false }),
+        supabase.from('health_daily_summaries').select('*').eq('user_id', userId!).gte('summary_date', new Date(Date.now() - Math.max(days, 7) * 86_400_000).toLocaleDateString('en-CA')).order('summary_date', { ascending: false }),
       ])
-      return { settings: settings.data, metrics: metricRows, entries: required(entries), workouts: required(workouts) }
+      return { settings: settings.data, metrics: metricRows, entries: required(entries), workouts: required(workouts), dailySummaries: required(dailySummaries) }
     },
   })
 }
